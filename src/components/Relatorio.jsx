@@ -29,7 +29,7 @@ const Relatorio = () => {
 
     const filtradas = senhas.filter((s) => {
       if (!s.dataEmissao) return false;
-      const dia = s.dataEmissao.slice(0, 10);
+      const dia = new Date(s.dataEmissao).toISOString().slice(0, 10);
       return s.agencia === agenciaAtiva && dia >= dataInicial && dia <= dataFinal;
     });
 
@@ -103,34 +103,36 @@ const Relatorio = () => {
         📋 Resultado ({senhasFiltradas.length} senhas)
       </h3>
 
-      <table border="1" cellPadding="8" style={{ width: '100%', fontSize: '0.9em', backgroundColor: '#ffffff' }}>
-        <thead style={{ backgroundColor: '#caf0f8' }}>
-          <tr>
-            <th>Código</th>
-            <th>Setor</th>
-            <th>Emitida em</th>
-            <th>Atendida em</th>
-            <th>Mesa</th>
-            <th>Nome</th>
-            <th>CPF</th>
-            <th>Telefone</th>
-          </tr>
-        </thead>
-        <tbody>
-          {senhasFiltradas.map((s, idx) => (
-            <tr key={idx}>
-              <td>{s.codigoSenha}</td>
-              <td>{s.setor}</td>
-              <td>{new Date(s.dataEmissao).toLocaleString()}</td>
-              <td>{s.dataAtendimento ? new Date(s.dataAtendimento).toLocaleString() : 'PENDENTE'}</td>
-              <td>{s.mesaAtendimento || ''}</td>
-              <td>{s.nome}</td>
-              <td>{s.cpf}</td>
-              <td>{s.telefone}</td>
+      <div style={{ overflowX: 'auto' }}>
+        <table border="1" cellPadding="8" style={{ minWidth: '720px', fontSize: '0.9em', backgroundColor: '#ffffff' }}>
+          <thead style={{ backgroundColor: '#caf0f8' }}>
+            <tr>
+              <th>Código</th>
+              <th>Setor</th>
+              <th>Emitida em</th>
+              <th>Atendida em</th>
+              <th>Mesa</th>
+              <th>Nome</th>
+              <th>CPF</th>
+              <th>Telefone</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {senhasFiltradas.map((s, idx) => (
+              <tr key={idx}>
+                <td>{s.codigoSenha}</td>
+                <td>{s.setor}</td>
+                <td>{new Date(s.dataEmissao).toLocaleString()}</td>
+                <td>{s.dataAtendimento ? new Date(s.dataAtendimento).toLocaleString() : 'PENDENTE'}</td>
+                <td>{s.mesaAtendimento || ''}</td>
+                <td>{s.nome}</td>
+                <td>{s.cpf}</td>
+                <td>{s.telefone}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <Footer />
     </div>

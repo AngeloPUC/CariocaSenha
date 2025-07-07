@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
-import { gerarHash } from '../utils/crypto'; // 🔐 Importa utilitário de hash
+import { gerarHash } from '../utils/crypto';
 
 const LoginScreen = () => {
   const [agenciaSelecionada, setAgenciaSelecionada] = useState('');
@@ -18,14 +18,21 @@ const LoginScreen = () => {
   const handleLogin = (e) => {
     e.preventDefault();
 
-    const senhaHash = gerarHash(senha); // 🔒 Criptografa a senha digitada
+    const senhaHash = gerarHash(senha);
 
     const dados = agenciasCadastradas.find(
       (a) => a.agencia === agenciaSelecionada && a.senha === senhaHash
     );
 
     if (dados) {
-      localStorage.setItem('agenciaAtiva', JSON.stringify({ agencia: dados.agencia }));
+      // 🔧 Agora salvando tempoAntecipacao corretamente
+      localStorage.setItem(
+        'agenciaAtiva',
+        JSON.stringify({
+          agencia: dados.agencia,
+          tempoAntecipacao: dados.tempoAntecipacao || 10
+        })
+      );
       navigate('/painel');
     } else {
       alert('Agência ou senha incorreta.');
@@ -74,6 +81,7 @@ const LoginScreen = () => {
             maxLength={6}
             onChange={(e) => setSenha(e.target.value)}
             placeholder="Senha (6 dígitos)"
+            autoComplete="current-password"
           />
 
           <br /><br />
