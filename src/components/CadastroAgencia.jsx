@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
@@ -9,15 +9,9 @@ const CadastroAgencia = () => {
   const [agencia, setAgencia] = useState('');
   const [senha, setSenha] = useState('');
   const [tempoAntecipacao, setTempoAntecipacao] = useState(10);
-  const [agenciasExistentes, setAgenciasExistentes] = useState([]);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const cadastradas = JSON.parse(localStorage.getItem('agencias')) || [];
-    setAgenciasExistentes(cadastradas);
-  }, []);
-
-  const handleCadastro = (e) => {
+  const handleCadastro = async (e) => {
     e.preventDefault();
     if (!agencia || !senha) {
       alert('Preencha todos os campos.');
@@ -25,21 +19,50 @@ const CadastroAgencia = () => {
     }
 
     const senhaCriptografada = gerarHash(senha);
+
+    // Verifica se a agência já existe no Supabase
+    const { data: existentes, error: erroBusca } = await supabase
+      .from('agencias')
+      .select('agencia')
+      .eq('agencia', agencia);
+
+    if (erroBusca) {
+      alert('Erro ao verificar agências existentes.');
+      console.error(erroBusca);
+      return;
+    }
+
+    if (existentes.length > 0) {
+      alert('Essa agência já está cadastrada.');
+      return;
+    }
+
+    // Salva a nova agência no Supabase
+    const { error: erroInsert } = await supabase.from('agencias').insert([
+      {
+        agencia,
+        senha: senhaCriptografada,
+        tempoAntecipacao: parseInt(tempoAntecipacao) || 10
+      }
+    ]);
+
+    if (erroInsert) {
+      alert('Erro ao cadastrar agência no banco.');
+      console.error(erroInsert);
+      return;
+    }
+
+    // Seta a agência ativa local para navegação no sistema
     const novaAgencia = {
       agencia,
-      senha: senhaCriptografada,
       tempoAntecipacao: parseInt(tempoAntecipacao) || 10
     };
 
-    const atualizadas = [...agenciasExistentes, novaAgencia];
-    localStorage.setItem('agencias', JSON.stringify(atualizadas));
     localStorage.setItem('agenciaAtiva', JSON.stringify(novaAgencia));
-
     alert('Agência cadastrada com sucesso!');
     navigate('/painel');
   };
 
-  // 🔥 Essa função deve ser chamada a partir do botão "Excluir Dados" no menu
   const excluirDadosDaAgencia = async () => {
     const ativa = JSON.parse(localStorage.getItem('agenciaAtiva'));
     if (!ativa?.agencia) {
@@ -47,7 +70,9 @@ const CadastroAgencia = () => {
       return;
     }
 
-    const confirmar = window.confirm(`Deseja mesmo excluir TODAS as senhas da agência ${ativa.agencia}? Esta ação é irreversível.`);
+    const confirmar = window.confirm(
+      `Deseja mesmo excluir TODAS as senhas da agência ${ativa.agencia}? Esta ação é irreversível.`
+    );
     if (!confirmar) return;
 
     const { error } = await supabase

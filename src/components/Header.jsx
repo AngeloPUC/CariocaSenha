@@ -14,7 +14,6 @@ const Header = () => {
 
   const excluirAgencia = async () => {
     const ativa = JSON.parse(localStorage.getItem('agenciaAtiva'));
-    const todas = JSON.parse(localStorage.getItem('agencias')) || [];
 
     if (!ativa?.agencia) {
       alert('Nenhuma agência ativa no momento.');
@@ -22,28 +21,38 @@ const Header = () => {
     }
 
     const confirmacao = window.confirm(
-      `Deseja realmente excluir TODAS as senhas da agência "${ativa.agencia}" do banco de dados? Esta ação não poderá ser desfeita.`
+      `Deseja realmente excluir a agência "${ativa.agencia}" e todas as suas senhas do banco de dados? Esta ação é irreversível.`
     );
 
     if (!confirmacao) return;
 
-    // 🔥 Exclui senhas no Supabase
-    const { error } = await supabase
+    // 🔥 1. Exclui senhas da agência
+    const { error: erroSenhas } = await supabase
       .from('senhas')
       .delete()
       .eq('agencia', ativa.agencia);
 
-    if (error) {
-      alert('Erro ao excluir os dados do banco.');
-      console.error(error);
-    } else {
-      alert(`Todos os dados da agência "${ativa.agencia}" foram removidos com sucesso do Supabase.`);
+    if (erroSenhas) {
+      alert('Erro ao excluir as senhas.');
+      console.error(erroSenhas);
+      return;
     }
 
-    // 🧹 Opcional: Limpa a agência local também
-    const atualizada = todas.filter((a) => a.agencia !== ativa.agencia);
-    localStorage.setItem('agencias', JSON.stringify(atualizada));
+    // ❌ 2. Exclui o cadastro da agência
+    const { error: erroAgencia } = await supabase
+      .from('agencias')
+      .delete()
+      .eq('agencia', ativa.agencia);
+
+    if (erroAgencia) {
+      alert('Erro ao excluir o cadastro da agência.');
+      console.error(erroAgencia);
+      return;
+    }
+
+    // 🧹 3. Limpa localStorage e redireciona
     localStorage.removeItem('agenciaAtiva');
+    alert(`Agência "${ativa.agencia}" e todos os seus dados foram removidos com sucesso.`);
     navigate('/cadastro');
   };
 

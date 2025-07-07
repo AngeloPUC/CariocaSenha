@@ -35,11 +35,10 @@ const ChamadaPainel = () => {
       return;
     }
 
-    // Ordena por tempoEfetivo (espera + antecipação)
     const agora = Date.now();
     const pendentesComEspera = data.map((s) => {
       const emMs = new Date(s.dataEmissao).getTime();
-      const esperaMin = Math.floor((agora - emMs) / 60000);
+      const esperaMin = Math.max(0, Math.floor((agora - emMs) / 60000));
       const antecipacao = s.prioridade ? (s.tempoAntecipacao || 10) : 0;
       return {
         ...s,
@@ -50,7 +49,6 @@ const ChamadaPainel = () => {
     pendentesComEspera.sort((a, b) => b.tempoEfetivo - a.tempoEfetivo);
     setSenhasPendentes(pendentesComEspera);
 
-    // Última chamada
     const { data: chamadas, error: erroUltima } = await supabase
       .from('senhas')
       .select('*')
@@ -100,7 +98,7 @@ const ChamadaPainel = () => {
   const calcularTempoEspera = (dataISO) => {
     const agora = Date.now();
     const inicio = new Date(dataISO).getTime();
-    const minutos = Math.floor((agora - inicio) / 60000);
+    const minutos = Math.max(0, Math.floor((agora - inicio) / 60000));
     let cor = 'blue';
     if (minutos > 30) cor = 'red';
     else if (minutos > 20) cor = 'orange';
