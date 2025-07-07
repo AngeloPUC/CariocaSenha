@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
 import { gerarHash } from '../utils/crypto';
+import { supabase } from '../supabaseClient';
 
 const CadastroAgencia = () => {
   const [agencia, setAgencia] = useState('');
@@ -38,17 +39,41 @@ const CadastroAgencia = () => {
     navigate('/painel');
   };
 
+  // 🔥 Essa função deve ser chamada a partir do botão "Excluir Dados" no menu
+  const excluirDadosDaAgencia = async () => {
+    const ativa = JSON.parse(localStorage.getItem('agenciaAtiva'));
+    if (!ativa?.agencia) {
+      alert('Nenhuma agência ativa encontrada.');
+      return;
+    }
+
+    const confirmar = window.confirm(`Deseja mesmo excluir TODAS as senhas da agência ${ativa.agencia}? Esta ação é irreversível.`);
+    if (!confirmar) return;
+
+    const { error } = await supabase
+      .from('senhas')
+      .delete()
+      .eq('agencia', ativa.agencia);
+
+    if (error) {
+      alert('Erro ao excluir dados no banco.');
+      console.error(error);
+    } else {
+      alert(`Todas as senhas da agência ${ativa.agencia} foram apagadas do Supabase.`);
+    }
+  };
+
   return (
     <div
       style={{
         padding: '20px',
         paddingBottom: '80px',
         minHeight: '100vh',
-        backgroundColor: '#d0e6ff', // restaurado ao azul padrão
+        backgroundColor: '#d0e6ff',
         boxSizing: 'border-box'
       }}
     >
-      <Header />
+      <Header excluirDadosDaAgencia={excluirDadosDaAgencia} />
       <h2>🏢 Cadastro de Agência</h2>
 
       <form onSubmit={handleCadastro} style={{ maxWidth: '320px', marginTop: '20px' }}>

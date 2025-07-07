@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import { supabase } from '../supabaseClient';
 import Header from './Header';
 import Footer from './Footer';
 
@@ -19,27 +20,34 @@ const Relatorio = () => {
     }
   }, []);
 
-  const buscarDados = () => {
-    const senhas = JSON.parse(localStorage.getItem('senhasAgencia')) || [];
-
+  const buscarDados = async () => {
     if (!dataInicial || !dataFinal) {
       alert('Preencha o intervalo de datas.');
       return;
     }
 
-    const filtradas = senhas.filter((s) => {
-      if (!s.dataEmissao) return false;
-      const dia = new Date(s.dataEmissao).toISOString().slice(0, 10);
-      return s.agencia === agenciaAtiva && dia >= dataInicial && dia <= dataFinal;
-    });
+    const inicioISO = `${dataInicial}T00:00:00Z`;
+    const fimISO = `${dataFinal}T23:59:59Z`;
 
-    filtradas.sort((a, b) => new Date(a.dataEmissao) - new Date(b.dataEmissao));
+    const { data, error } = await supabase
+      .from('senhas')
+      .select('*')
+      .eq('agencia', agenciaAtiva)
+      .gte('dataEmissao', inicioISO)
+      .lte('dataEmissao', fimISO)
+      .order('dataEmissao', { ascending: true });
 
-    if (filtradas.length === 0) {
+    if (error) {
+      alert('Erro ao buscar dados no banco.');
+      console.error(error);
+      return;
+    }
+
+    if (data.length === 0) {
       alert('Nenhuma senha encontrada para este intervalo.');
     }
 
-    setSenhasFiltradas(filtradas);
+    setSenhasFiltradas(data);
   };
 
   const exportarExcel = () => {
@@ -125,9 +133,9 @@ const Relatorio = () => {
                 <td>{new Date(s.dataEmissao).toLocaleString()}</td>
                 <td>{s.dataAtendimento ? new Date(s.dataAtendimento).toLocaleString() : 'PENDENTE'}</td>
                 <td>{s.mesaAtendimento || ''}</td>
-                <td>{s.nome}</td>
-                <td>{s.cpf}</td>
-                <td>{s.telefone}</td>
+                <td>{s.nome || ''}</td>
+                <td>{s.cpf || ''}</td>
+                <td>{s.telefone || ''}</td>
               </tr>
             ))}
           </tbody>

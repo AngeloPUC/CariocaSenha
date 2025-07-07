@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from './Header';
 import Footer from './Footer';
+import { supabase } from '../supabaseClient';
 
 const ChamadaPainel = () => {
   const [senhasPendentes, setSenhasPendentes] = useState([]);
@@ -20,66 +21,94 @@ const ChamadaPainel = () => {
     }
   }, [setorAtual]);
 
-  const atualizarFila = (agencia, setor) => {
-    const todas = JSON.parse(localStorage.getItem('senhasAgencia')) || [];
+  const atualizarFila = async (agencia, setor) => {
+    const { data, error } = await supabase
+      .from('senhas')
+      .select('*')
+      .eq('agencia', agencia)
+      .eq('setor', setor)
+      .is('dataAtendimento', null);
 
-    const pendentes = todas.filter(
-      (s) => !s.dataAtendimento && s.setor === setor && s.agencia === agencia
-    );
-
-    const chamadas = todas
-      .filter((s) => s.dataAtendimento && s.setor === setor && s.agencia === agencia)
-      .sort((a, b) => b.dataAtendimento - a.dataAtendimento);
-
-    setSenhasPendentes(pendentes);
-    setUltimaChamada(chamadas[0] || null);
-  };
-
-  const chamarProxima = () => {
-    const todas = JSON.parse(localStorage.getItem('senhasAgencia')) || [];
-
-    const pendentes = todas.filter(
-      (s) => !s.dataAtendimento && s.setor === setorAtual && s.agencia === agenciaAtiva
-    );
-
-    if (pendentes.length === 0) {
-      alert('Nenhuma senha pendente para esse setor.');
+    if (error) {
+      alert('Erro ao buscar senhas pendentes.');
+      console.error(error);
       return;
     }
 
+    // Ordena por tempoEfetivo (espera + antecipação)
     const agora = Date.now();
-
-    const comEspera = pendentes.map((s) => {
-      const esperaMin = Math.floor((agora - s.dataEmissao) / 60000);
+    const pendentesComEspera = data.map((s) => {
+      const emMs = new Date(s.dataEmissao).getTime();
+      const esperaMin = Math.floor((agora - emMs) / 60000);
       const antecipacao = s.prioridade ? (s.tempoAntecipacao || 10) : 0;
       return {
         ...s,
-        tempoEfetivo: esperaMin + antecipacao,
+        tempoEfetivo: esperaMin + antecipacao
       };
     });
 
-    comEspera.sort((a, b) => b.tempoEfetivo - a.tempoEfetivo);
-    const selecionada = comEspera[0];
+    pendentesComEspera.sort((a, b) => b.tempoEfetivo - a.tempoEfetivo);
+    setSenhasPendentes(pendentesComEspera);
 
-    const index = todas.findIndex((s) => s.codigoSenha === selecionada.codigoSenha);
-    todas[index].dataAtendimento = agora;
+    // Última chamada
+    const { data: chamadas, error: erroUltima } = await supabase
+      .from('senhas')
+      .select('*')
+      .eq('agencia', agencia)
+      .eq('setor', setor)
+      .not('dataAtendimento', 'is', null)
+      .order('dataAtendimento', { ascending: false })
+      .limit(1);
 
-    localStorage.setItem('senhasAgencia', JSON.stringify(todas));
+    if (!erroUltima && chamadas?.length > 0) {
+      setUltimaChamada(chamadas[0]);
+    } else {
+      setUltimaChamada(null);
+    }
+  };
+
+  const chamarProxima = async () => {
+    if (!mesa) {
+      alert('Informe a mesa antes de chamar.');
+      return;
+    }
+
+    if (senhasPendentes.length === 0) {
+      alert('Nenhuma senha pendente.');
+      return;
+    }
+
+    const selecionada = senhasPendentes[0];
+
+    const { error } = await supabase
+      .from('senhas')
+      .update({
+        dataAtendimento: new Date().toISOString(),
+        mesaAtendimento: mesa
+      })
+      .eq('id', selecionada.id);
+
+    if (error) {
+      alert('Erro ao chamar senha.');
+      console.error(error);
+      return;
+    }
+
     atualizarFila(agenciaAtiva, setorAtual);
   };
 
-  const calcularTempoEspera = (timestamp) => {
+  const calcularTempoEspera = (dataISO) => {
     const agora = Date.now();
-    const minutos = Math.floor((agora - timestamp) / 60000);
+    const inicio = new Date(dataISO).getTime();
+    const minutos = Math.floor((agora - inicio) / 60000);
     let cor = 'blue';
     if (minutos > 30) cor = 'red';
     else if (minutos > 20) cor = 'orange';
     return { minutos, cor };
   };
 
-  const formatarHora = (timestamp) => {
-    const data = new Date(timestamp);
-    return data.toLocaleTimeString('pt-BR', { hour12: false });
+  const formatarHora = (iso) => {
+    return new Date(iso).toLocaleTimeString('pt-BR', { hour12: false });
   };
 
   return (
@@ -89,7 +118,7 @@ const ChamadaPainel = () => {
         paddingBottom: '80px',
         minHeight: '100vh',
         backgroundColor: '#f7faff',
-        boxSizing: 'border-box',
+        boxSizing: 'border-box'
       }}
     >
       <Header />

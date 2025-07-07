@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import CryptoJS from 'crypto-js';
 import Header from './Header';
 import Footer from './Footer';
+import { supabase } from '../supabaseClient';
 
 const setores = ['VAREJO', 'GERENCIA', 'CAIXAS', 'PENHOR', 'EXPRESSO', 'ATENDIMENTO'];
 
@@ -15,42 +16,44 @@ const EmissorSenha = () => {
   const [prioridade, setPrioridade] = useState(false);
 
   useEffect(() => {
-    try {
-      const ativa = JSON.parse(localStorage.getItem('agenciaAtiva'));
-      if (ativa?.agencia) {
-        setAgenciaAtiva(ativa.agencia);
-        setTempoAntecipacao(ativa.tempoAntecipacao || 10);
-      } else {
-        throw new Error();
-      }
-    } catch {
+    const ativa = JSON.parse(localStorage.getItem('agenciaAtiva'));
+    if (ativa?.agencia) {
+      setAgenciaAtiva(ativa.agencia);
+      setTempoAntecipacao(ativa.tempoAntecipacao || 10);
+    } else {
       alert('Nenhuma agência ativa. Faça login novamente.');
       window.location.href = '/';
     }
   }, []);
 
-  const gerarSenha = () => {
+  const gerarSenha = async () => {
     if (!setor) {
       alert('Selecione o setor!');
       return;
     }
 
-    // Sequência por agência + setor
-    const keyContador = `contador_${agenciaAtiva}_${setor}`;
-    const atual = parseInt(localStorage.getItem(keyContador)) || 0;
-    const sequencial = atual + 1;
-    localStorage.setItem(keyContador, sequencial);
+    // 🧠 Busca quantas senhas já existem dessa agência/setor
+    const { data: existentes, error: consultaErro } = await supabase
+      .from('senhas')
+      .select('id', { count: 'exact' })
+      .eq('agencia', agenciaAtiva)
+      .eq('setor', setor);
 
-    // Geração do código da senha
+    if (consultaErro) {
+      alert(`Erro ao consultar: ${consultaErro.message}`);
+      console.error(consultaErro);
+      return;
+    }
+
+    const sequencial = (existentes?.length || 0) + 1;
     const prefixoSetor = setor.slice(0, 3).toUpperCase();
     const digitoVerificador = Math.floor(Math.random() * 10);
-
     const numeroBase = `${prefixoSetor}${sequencial.toString().padStart(3, '0')}-${digitoVerificador}`;
     const codigo = prioridade
       ? `${agenciaAtiva}-P.${numeroBase}`
       : `${agenciaAtiva}-${numeroBase}`;
 
-    const timestampAgora = Date.now();
+    const timestampAgora = new Date().toISOString();
     const senhaCripto = CryptoJS.SHA256(codigo).toString();
 
     const novaSenha = {
@@ -64,12 +67,15 @@ const EmissorSenha = () => {
       cpf,
       telefone,
       prioridade,
-      tempoAntecipacao
+      tempoAntecipacao: Number(tempoAntecipacao) || 10
     };
 
-    const senhasSalvas = JSON.parse(localStorage.getItem('senhasAgencia')) || [];
-    senhasSalvas.push(novaSenha);
-    localStorage.setItem('senhasAgencia', JSON.stringify(senhasSalvas));
+    const { error: insertErro } = await supabase.from('senhas').insert([novaSenha]);
+    if (insertErro) {
+      alert(`Erro ao salvar no banco: ${insertErro.message}`);
+      console.error(insertErro);
+      return;
+    }
 
     alert(`Senha gerada: ${codigo}`);
     setSetor('');

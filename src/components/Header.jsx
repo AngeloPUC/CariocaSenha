@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import './Header.css';
+import { supabase } from '../supabaseClient';
 
 const Header = () => {
   const [open, setOpen] = useState(false);
@@ -11,7 +12,7 @@ const Header = () => {
     navigate('/');
   };
 
-  const excluirAgencia = () => {
+  const excluirAgencia = async () => {
     const ativa = JSON.parse(localStorage.getItem('agenciaAtiva'));
     const todas = JSON.parse(localStorage.getItem('agencias')) || [];
 
@@ -21,16 +22,29 @@ const Header = () => {
     }
 
     const confirmacao = window.confirm(
-      `Deseja realmente excluir os dados da agência "${ativa.agencia}"? Esta ação não poderá ser desfeita.`
+      `Deseja realmente excluir TODAS as senhas da agência "${ativa.agencia}" do banco de dados? Esta ação não poderá ser desfeita.`
     );
 
-    if (confirmacao) {
-      const atualizada = todas.filter((a) => a.agencia !== ativa.agencia);
-      localStorage.setItem('agencias', JSON.stringify(atualizada));
-      localStorage.removeItem('agenciaAtiva');
-      localStorage.removeItem('senhasAgencia');
-      navigate('/cadastro');
+    if (!confirmacao) return;
+
+    // 🔥 Exclui senhas no Supabase
+    const { error } = await supabase
+      .from('senhas')
+      .delete()
+      .eq('agencia', ativa.agencia);
+
+    if (error) {
+      alert('Erro ao excluir os dados do banco.');
+      console.error(error);
+    } else {
+      alert(`Todos os dados da agência "${ativa.agencia}" foram removidos com sucesso do Supabase.`);
     }
+
+    // 🧹 Opcional: Limpa a agência local também
+    const atualizada = todas.filter((a) => a.agencia !== ativa.agencia);
+    localStorage.setItem('agencias', JSON.stringify(atualizada));
+    localStorage.removeItem('agenciaAtiva');
+    navigate('/cadastro');
   };
 
   return (
